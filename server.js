@@ -1,10 +1,10 @@
-// server.js (WebSocket server)
 
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const { MongoClient } = require('mongodb');
+
 require('dotenv').config();
 
 const app = express();
@@ -13,13 +13,12 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*', // Replace with your Next.js URL if necessary
+    origin: '*', 
     methods: ['GET', 'POST'],
   },
 });
 
-// MongoDB connection
-const MONGO_URI = process.env.MONGO_URI; // Your MongoDB URI from environment variables
+const MONGO_URI = process.env.MONGO_URI; 
 const client = new MongoClient(MONGO_URI);
 
 async function connectToDB() {
@@ -35,17 +34,15 @@ app.get('/', (req, res) => {
   res.send('WebSocket server is running');
 });
 
-// Function to create a consistent room name
 const createRoomName = (senderId, receiverId) => {
   return [senderId, receiverId].sort().join('_');
 };
 
-// WebSocket connection handler
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
-  // Listen for join room events
   socket.on('joinRoom', (roomName) => {
+    console.log(`User joined room: ${roomName}, socket ID: ${socket.id}`);
     socket.join(roomName);
     console.log(`User joined room: ${roomName}`);
   });
@@ -54,11 +51,10 @@ io.on('connection', (socket) => {
   socket.on('privateMessage', async (msg) => {
     const { senderId, receiverId, message } = msg;
     const roomName = createRoomName(senderId, receiverId);
-    console.log(message);
-
-    // Save message to MongoDB
-    const db = client.db('EventsLink_Project'); // Use your actual database name
-    const messagesCollection = db.collection('chatMessages');
+    console.log(`Message from ${senderId} to ${receiverId}:`, message);
+    try{
+      const db = client.db('EventsLink_Project'); 
+    const messagesCollection = db.collection('messages');
     await messagesCollection.insertOne({
       message,
       senderId,
@@ -66,8 +62,10 @@ io.on('connection', (socket) => {
       timestamp: new Date(),
     });
 
-    // Emit the message only to the room participants
     io.to(roomName).emit('privateMessage', msg);
+    } catch(error){
+      console.log('Error saving message:', error);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -75,10 +73,9 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start the server
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, async () => {
   console.log(`WebSocket server is running on port ${PORT}`);
-  await connectToDB(); // Connect to MongoDB when the server starts
+  await connectToDB();
 });
 
